@@ -110,7 +110,7 @@ const Chat: React.FC = () => {
     return (
       <div className="flex-1 flex flex-col bg-[#343541] relative">
         {/* Header with Model Selector */}
-        <div className="absolute top-0 left-0 right-0 h-12 flex items-center justify-between px-4 bg-[#343541] border-b border-gray-700 z-10">
+        <div className="absolute top-0 left-0 right-0 h-12 flex items-center px-4 bg-[#343541] border-b border-gray-700 z-10">
           <ModelSelector />
         </div>
 
@@ -188,7 +188,7 @@ const Chat: React.FC = () => {
   return (
     <div className="flex-1 flex flex-col bg-[#343541] relative h-full">
       {/* Header with Model Selector */}
-      <div className="h-12 flex items-center justify-between px-4 bg-[#343541] border-b border-gray-700 z-10 shrink-0">
+      <div className="h-12 flex items-center px-4 bg-[#343541] border-b border-gray-700 z-10 shrink-0">
         <ModelSelector />
       </div>
 

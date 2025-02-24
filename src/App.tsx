@@ -72,23 +72,6 @@ const App: React.FC = () => {
 
   return (
     <div className="h-screen flex flex-col bg-[#343541]">
-      {/* Window Controls */}
-      <div className="h-8 flex items-center px-2 bg-[#1a1a1a] z-50 draggable shrink-0">
-        <div className="flex space-x-2 non-draggable">
-          <button
-            onClick={() => window.electron.window.close()}
-            className="w-3 h-3 rounded-full bg-[#ff5f57] hover:bg-[#ff4444]"
-          />
-          <button
-            onClick={() => window.electron.window.minimize()}
-            className="w-3 h-3 rounded-full bg-[#febc2e] hover:bg-[#ffaa00]"
-          />
-          <button
-            onClick={() => window.electron.window.maximize()}
-            className="w-3 h-3 rounded-full bg-[#28c840] hover:bg-[#00aa00]"
-          />
-        </div>
-      </div>
       
       {/* Main Content */}
       <div className="flex flex-1 min-h-0">
