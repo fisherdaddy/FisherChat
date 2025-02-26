@@ -101,8 +101,8 @@ if (!gotTheLock) {
         isDev ? "script-src 'self' 'unsafe-inline' http://localhost:5173 ws://localhost:5173" : "script-src 'self'",
         "style-src 'self' 'unsafe-inline'",
         "img-src 'self' data: https: http:",
-        // 正确的 connect-src 配置，合并所有域名
-        `connect-src 'self' https://api.deepseek.com https://*.deepseek.com ${isDev ? "ws://localhost:*" : "wss:"}`,
+        // 允许连接到所有域名，不做限制
+        "connect-src *",
         "font-src 'self' data:",
         "media-src 'self'",
         "worker-src 'self' blob:",

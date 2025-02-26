@@ -8,6 +8,7 @@ import {
   UserCircleIcon,
   PlusIcon,
   ChatBubbleLeftIcon,
+  SparklesIcon,
 } from '@heroicons/react/24/outline';
 import { addConversation, setCurrentConversation } from '../store/slices/chatSlice';
 import { chatService } from '../services/chat';
@@ -49,29 +50,29 @@ const Sidebar: React.FC<SidebarProps> = ({ onShowLogin }) => {
     .sort((a, b) => b.updatedAt - a.updatedAt);
 
   return (
-    <div className={`bg-[#202123] flex flex-col ${isCollapsed ? 'w-[60px]' : 'w-[260px]'} transition-all duration-300 h-full`}>
+    <div className={`bg-slate-950 flex flex-col ${isCollapsed ? 'w-[60px]' : 'w-[260px]'} transition-all duration-300 h-full border-r border-slate-800`}>
       {/* Search and Collapse Section */}
       <div className="flex items-center space-x-2 p-2 shrink-0">
         <div className={`relative flex-1 ${isCollapsed ? 'hidden' : 'block'}`}>
           <div className="absolute inset-y-0 left-3 flex items-center pointer-events-none">
-            <MagnifyingGlassIcon className="h-4 w-4 text-gray-500" />
+            <MagnifyingGlassIcon className="h-4 w-4 text-slate-400" />
           </div>
           <input
             type="text"
             placeholder="搜索历史对话"
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
-            className="w-full pl-9 pr-3 py-2 bg-[#2d2d30] text-white rounded-md text-sm focus:outline-none"
+            className="w-full pl-9 pr-3 py-2 bg-slate-800 text-white rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 border border-slate-700"
           />
         </div>
         <button
           onClick={() => setIsCollapsed(!isCollapsed)}
-          className="p-2 hover:bg-gray-800 rounded-md"
+          className="p-2 hover:bg-slate-800 rounded-lg text-slate-400 hover:text-white transition-colors"
         >
           {isCollapsed ? (
-            <ChevronRightIcon className="h-4 w-4 text-gray-400" />
+            <ChevronRightIcon className="h-4 w-4" />
           ) : (
-            <ChevronLeftIcon className="h-4 w-4 text-gray-400" />
+            <ChevronLeftIcon className="h-4 w-4" />
           )}
         </button>
       </div>
@@ -80,28 +81,30 @@ const Sidebar: React.FC<SidebarProps> = ({ onShowLogin }) => {
       <div className="p-2 shrink-0">
         <button
           onClick={handleNewChat}
-          className={`flex items-center space-x-2 w-full p-2 bg-[#2d2d30] hover:bg-gray-800 rounded-md text-gray-300 ${
+          className={`flex items-center space-x-2 w-full p-2.5 bg-slate-800 hover:bg-slate-700 border border-slate-700 rounded-lg text-slate-300 hover:text-white transition-colors ${
             isCollapsed ? 'justify-center' : 'justify-start'
           }`}
         >
           <PlusIcon className="h-5 w-5" />
-          {!isCollapsed && <span>新建对话</span>}
+          {!isCollapsed && <span className="font-medium">新建对话</span>}
         </button>
       </div>
 
       {/* Conversations List */}
-      <div className="flex-1 overflow-y-auto min-h-0">
+      <div className="flex-1 overflow-y-auto min-h-0 py-2">
         {filteredConversations.map((conversation) => (
           <div
             key={conversation.id}
             onClick={() => handleSelectConversation(conversation.id)}
-            className={`p-2 mx-2 my-1 flex items-center space-x-2 cursor-pointer rounded-md ${
+            className={`p-2 mx-2 my-1 flex items-center space-x-2 cursor-pointer rounded-lg transition-colors ${
               conversation.id === currentConversationId
-                ? 'bg-gray-800 text-white'
-                : 'text-gray-300 hover:bg-gray-800'
+                ? 'bg-slate-800/80 text-white'
+                : 'text-slate-300 hover:bg-slate-800/50'
             }`}
           >
-            <ChatBubbleLeftIcon className="h-4 w-4 flex-shrink-0" />
+            <div className="w-6 h-6 rounded-full flex items-center justify-center flex-shrink-0">
+              <ChatBubbleLeftIcon className="h-4 w-4" />
+            </div>
             {!isCollapsed && (
               <span className="truncate text-sm">{conversation.title || 'New Chat'}</span>
             )}
@@ -110,18 +113,20 @@ const Sidebar: React.FC<SidebarProps> = ({ onShowLogin }) => {
       </div>
 
       {/* User Section */}
-      <div className="border-t border-gray-700 p-2 shrink-0">
+      <div className="border-t border-slate-800 p-2 shrink-0">
         <button
           onClick={onShowLogin}
-          className={`flex items-center space-x-2 w-full p-2 hover:bg-gray-800 rounded-md text-gray-300 ${
+          className={`flex items-center space-x-2 w-full p-2.5 hover:bg-slate-800 rounded-lg text-slate-300 hover:text-white transition-colors ${
             isCollapsed ? 'justify-center' : 'justify-start'
           }`}
         >
-          <UserCircleIcon className="h-5 w-5" />
+          <div className="w-6 h-6 rounded-full bg-gradient-to-br from-purple-500 to-indigo-600 flex items-center justify-center flex-shrink-0">
+            <UserCircleIcon className="h-4 w-4 text-white" />
+          </div>
           {!isCollapsed && (
             <div className="flex-1 flex items-center justify-between">
-              <span>User</span>
-              {!isAuthenticated && <span className="text-xs text-gray-500">点击登录</span>}
+              <span className="font-medium">User</span>
+              {!isAuthenticated && <span className="text-xs text-slate-400">点击登录</span>}
             </div>
           )}
         </button>

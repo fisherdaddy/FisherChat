@@ -18,12 +18,26 @@ export class ApiError extends Error {
 
 class ApiService {
   private config: ApiConfig | null = null;
+  private abortController: AbortController | null = null;
 
   setConfig(config: ApiConfig) {
     this.config = config;
   }
 
-  async chat(message: string, onProgress?: (content: string) => void): Promise<string> {
+  cancelOngoingRequest() {
+    if (this.abortController) {
+      this.abortController.abort();
+      this.abortController = null;
+      return true;
+    }
+    return false;
+  }
+
+  async chat(
+    message: string, 
+    onProgress?: (content: string) => void,
+    history: Array<{role: string, content: string}> = []
+  ): Promise<string> {
     if (!this.config) {
       throw new ApiError('API configuration not set. Please configure your API settings in the settings menu.');
     }
@@ -32,10 +46,21 @@ class ApiService {
       throw new ApiError('API key is not configured. Please set your API key in the settings menu.');
     }
 
+    let fullContent = '';
+    
     try {
+      // Cancel any ongoing request
+      this.cancelOngoingRequest();
+      
+      // Create a new abort controller for this request
+      this.abortController = new AbortController();
       const selectedModel = store.getState().model.selectedModel;
-
-      console.log('>>>>>', this.config.baseUrl);
+      
+      // Create messages array with history and current message
+      const messages = [
+        ...history,
+        { role: 'user', content: message }
+      ];
 
       const response = await fetch(`${this.config.baseUrl}/v1/chat/completions`, {
         method: 'POST',
@@ -46,9 +71,10 @@ class ApiService {
         },
         body: JSON.stringify({
           model: selectedModel.id,
-          messages: [{ role: 'user', content: message }],
+          messages: messages,
           stream: true,
         }),
+        signal: this.abortController.signal
       });
 
       if (!response.ok) {
@@ -66,7 +92,7 @@ class ApiService {
 
       const reader = response.body.getReader();
       const decoder = new TextDecoder();
-      let fullContent = '';
+      fullContent = '';
 
       while (true) {
         const { value, done } = await reader.read();
@@ -76,6 +102,7 @@ class ApiService {
         const lines = chunk.split('\n');
 
         for (const line of lines) {
+          console.log('>>>>>', line);
           if (line.startsWith('data: ')) {
             const data = line.slice(6);
             if (data === '[DONE]') continue;
@@ -100,6 +127,11 @@ class ApiService {
 
       return fullContent;
     } catch (error) {
+      // Check if this is an abort error, and if so, return what we have so far
+      if (error instanceof DOMException && error.name === 'AbortError') {
+        return fullContent || 'Response was stopped.';
+      }
+
       if (error instanceof ApiError) {
         throw error;
       }
@@ -109,6 +141,9 @@ class ApiService {
       }
 
       throw new ApiError('An unexpected error occurred while calling the API. Please try again.');
+    } finally {
+      // Reset the abort controller
+      this.abortController = null;
     }
   }
 }

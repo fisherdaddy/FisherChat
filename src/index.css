@@ -2,6 +2,53 @@
 @tailwind components;
 @tailwind utilities;
 
+/* KaTeX styles */
+.katex-display {
+  overflow-x: auto;
+  overflow-y: hidden;
+  padding: 1em 0;
+  margin: 1em 0;
+}
+
+/* Improve code block styles */
+pre {
+  background-color: rgba(15, 23, 42, 0.8) !important;
+  border-radius: 0.5rem !important;
+  padding: 1em !important;
+  margin: 1em 0 !important;
+  overflow-x: auto !important;
+}
+
+code {
+  font-family: 'Fira Code', monospace, Menlo, Monaco, 'Courier New', monospace;
+}
+
+/* Improve table styles */
+table {
+  border-collapse: collapse;
+  margin: 1em 0;
+  width: 100%;
+}
+
+th, td {
+  border: 1px solid #334155;
+  padding: 0.5em;
+}
+
+th {
+  background-color: rgba(51, 65, 85, 0.5);
+  font-weight: bold;
+}
+
+/* Style for blockquotes */
+blockquote {
+  border-left: 3px solid #334155;
+  padding-left: 1em;
+  color: #cbd5e1;
+  font-style: italic;
+  margin: 1em 0;
+}
+
 :root {
   font-family: Inter, system-ui, Avenir, Helvetica, Arial, sans-serif;
   line-height: 1.5;

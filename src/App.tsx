@@ -8,6 +8,7 @@ import Settings from './components/Settings';
 import { configService } from './services/config';
 import { apiService } from './services/api';
 import type { ApiConfig } from './services/api';
+import { SparklesIcon } from '@heroicons/react/24/outline';
 
 const App: React.FC = () => {
   const [showSettings, setShowSettings] = useState(false);
@@ -55,23 +56,39 @@ const App: React.FC = () => {
 
   if (!isInitialized) {
     return (
-      <div className="h-screen flex items-center justify-center bg-[#343541]">
-        <div className="text-white text-xl">Loading...</div>
+      <div className="h-screen flex items-center justify-center bg-slate-900">
+        <div className="flex flex-col items-center space-y-4">
+          <div className="w-12 h-12 rounded-full bg-gradient-to-br from-blue-400 to-cyan-500 flex items-center justify-center shadow-lg animate-pulse">
+            <SparklesIcon className="h-6 w-6 text-white" />
+          </div>
+          <div className="text-white text-xl font-medium">加载中...</div>
+        </div>
       </div>
     );
   }
 
   if (initError) {
     return (
-      <div className="h-screen flex flex-col items-center justify-center bg-[#343541]">
-        <div className="text-white text-xl mb-4">{initError}</div>
+      <div className="h-screen flex flex-col items-center justify-center bg-slate-900">
+        <div className="flex flex-col items-center space-y-6 max-w-md px-6">
+          <div className="w-16 h-16 rounded-full bg-gradient-to-br from-red-400 to-orange-500 flex items-center justify-center shadow-lg">
+            <SparklesIcon className="h-8 w-8 text-white" />
+          </div>
+          <div className="text-white text-xl font-medium text-center">{initError}</div>
+          <button 
+            onClick={() => setShowSettings(true)}
+            className="px-6 py-2.5 bg-gradient-to-r from-blue-500 to-cyan-500 hover:from-blue-600 hover:to-cyan-600 text-white rounded-lg shadow-md transition-colors text-sm font-medium"
+          >
+            打开设置
+          </button>
+        </div>
         {showSettings && <Settings onClose={() => setShowSettings(false)} />}
       </div>
     );
   }
 
   return (
-    <div className="h-screen flex flex-col bg-[#343541]">
+    <div className="h-screen flex flex-col bg-slate-900">
       
       {/* Main Content */}
       <div className="flex flex-1 min-h-0">
