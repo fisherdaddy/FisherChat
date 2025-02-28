@@ -18,20 +18,20 @@ const ModelSelector: React.FC = () => {
     <div className="relative">
       <button
         onClick={() => setIsOpen(!isOpen)}
-        className="flex items-center space-x-2 px-3 py-1.5 rounded-md hover:bg-slate-800 text-slate-200 border border-slate-700 transition-colors"
+        className="flex items-center space-x-2 px-3 py-1.5 rounded-md dark:hover:bg-slate-800 hover:bg-slate-200 dark:text-slate-200 text-slate-700 dark:border-slate-700 border-slate-300 border transition-colors"
       >
         <span className="font-medium">{selectedModel.name}</span>
-        <ChevronDownIcon className="h-4 w-4 text-slate-400" />
+        <ChevronDownIcon className="h-4 w-4 dark:text-slate-400 text-slate-500" />
       </button>
 
       {isOpen && (
-        <div className="absolute top-full mt-1 w-48 bg-slate-800 rounded-md shadow-lg z-50 border border-slate-700 overflow-hidden">
+        <div className="absolute top-full mt-1 w-48 dark:bg-slate-800 bg-white rounded-md shadow-lg z-50 dark:border-slate-700 border-slate-300 border overflow-hidden">
           {availableModels.map((model) => (
             <button
               key={model.id}
               onClick={() => handleModelSelect(model)}
-              className={`w-full px-4 py-2.5 text-left text-slate-200 hover:bg-slate-700 flex items-center justify-between transition-colors ${
-                model.id === selectedModel.id ? 'bg-slate-700/50' : ''
+              className={`w-full px-4 py-2.5 text-left dark:text-slate-200 text-slate-700 dark:hover:bg-slate-700 hover:bg-slate-100 flex items-center justify-between transition-colors ${
+                model.id === selectedModel.id ? 'dark:bg-slate-700/50 bg-slate-100' : ''
               }`}
             >
               <span>{model.name}</span>

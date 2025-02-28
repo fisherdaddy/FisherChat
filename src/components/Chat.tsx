@@ -10,6 +10,7 @@ import {
 import { chatService } from '../services/chat';
 import { apiService } from '../services/api';
 import { ApiError } from '../services/api';
+import { i18nService } from '../services/i18n';
 import {
   PaperAirplaneIcon,
   MicrophoneIcon,
@@ -34,6 +35,25 @@ import { Prism as SyntaxHighlighter } from 'react-syntax-highlighter';
 import { atomDark } from 'react-syntax-highlighter/dist/esm/styles/prism';
 import 'katex/dist/katex.min.css';
 
+// Function to convert LaTeX delimiters to remark-math compatible format
+const convertLatexDelimiters = (text: string): string => {
+  if (!text) return text;
+  
+  // Replace LaTeX inline math delimiters \( ... \) with $...$ 
+  // Use a more robust approach to handle nested delimiters
+  let result = text;
+  
+  // First, handle display math: \[ ... \] -> $$ ... $$
+  const displayMathRegex = /\\\[([\s\S]*?)\\\]/g;
+  result = result.replace(displayMathRegex, (_, math) => `$$${math}$$`);
+  
+  // Then handle inline math: \( ... \) -> $ ... $
+  const inlineMathRegex = /\\\(([\s\S]*?)\\\)/g;
+  result = result.replace(inlineMathRegex, (_, math) => `$${math}$`);
+  
+  return result;
+};
+
 // Modern AI typing indicator with pulse and shimmer effects
 const TypingIndicator: React.FC = () => (
   <div className="flex items-center space-x-2 animate-pulse">
@@ -54,7 +74,10 @@ const Chat: React.FC = () => {
   const [editingMessageId, setEditingMessageId] = useState<string | null>(null);
   const [editingContent, setEditingContent] = useState('');
   const [copiedMessageId, setCopiedMessageId] = useState<string | null>(null);
+  const [bottomPadding, setBottomPadding] = useState(120); // Default bottom padding
   const messagesEndRef = useRef<HTMLDivElement>(null);
+  const textareaRef = useRef<HTMLTextAreaElement>(null);
+  const inputAreaRef = useRef<HTMLDivElement>(null);
   const currentConversationId = useSelector((state: RootState) => state.chat.currentConversationId);
   const conversations = useSelector((state: RootState) => state.chat.conversations);
   const currentConversation = conversations.find(c => c.id === currentConversationId);
@@ -139,6 +162,32 @@ const Chat: React.FC = () => {
         display: inline-block !important;
         vertical-align: top !important;
       }
+      
+      /* KaTeX 公式样式优化 */
+      .katex-display {
+        margin: 1em 0 !important;
+        overflow-x: auto !important;
+        overflow-y: hidden !important;
+        padding-top: 0.5em !important;
+        padding-bottom: 0.5em !important;
+      }
+      
+      .katex {
+        font-size: 1.1em !important;
+      }
+      
+      /* 内联公式样式 */
+      .katex-inline {
+        display: inline-block !important;
+        padding: 0 0.1em !important;
+      }
+      
+      /* 块级公式样式 */
+      .katex-block {
+        display: block !important;
+        padding: 0.5em 0 !important;
+        overflow-x: auto !important;
+      }
     `;
     document.head.appendChild(style);
   
@@ -147,14 +196,92 @@ const Chat: React.FC = () => {
     };
   }, []);
 
+  // Update bottom padding when textarea content changes
+  useEffect(() => {
+    if (inputAreaRef.current) {
+      const inputHeight = inputAreaRef.current.clientHeight;
+      // Add more extra padding to ensure messages don't get hidden
+      setBottomPadding(inputHeight + 50); // Increased from +10 to +50
+    }
+  }, [input]);
+
+  // Update the scrollToBottom function for a more nuanced approach similar to mature AI chat applications
   const scrollToBottom = () => {
-    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+    if (messagesEndRef.current) {
+      // Get the parent scroll container
+      const scrollContainer = messagesEndRef.current.parentElement?.parentElement;
+      if (!scrollContainer) return;
+      
+      // Calculate how much content is currently hidden
+      const scrollBottom = scrollContainer.scrollTop + scrollContainer.clientHeight;
+      const scrollMax = scrollContainer.scrollHeight;
+      const scrollDistance = scrollMax - scrollBottom;
+      
+      // If user is very close to bottom or AI is responding, scroll all the way down
+      if (scrollDistance < 100 || isAiResponding) {
+        messagesEndRef.current.scrollIntoView({ 
+          behavior: 'smooth', 
+          block: 'start'  // Align to top of element (which is our spacer div)
+        });
+      }
+      // Otherwise, user may be reading previous messages, so don't auto-scroll
+    }
+  };
+  
+  // Add a helper function to force scrolling to the very bottom (for use after new messages)
+  const forceScrollToBottom = () => {
+    if (messagesEndRef.current) {
+      messagesEndRef.current.scrollIntoView({ 
+        behavior: 'smooth', 
+        block: 'start' 
+      });
+    }
   };
 
+  // Add dedicated scroll handling for when new user messages are sent
   useEffect(() => {
-    scrollToBottom();
-  }, [currentConversation?.messages]);
+    // When user sends a message, always scroll to bottom
+    if (currentConversation?.messages?.length && 
+        currentConversation.messages[currentConversation.messages.length - 1]?.role === 'user') {
+      forceScrollToBottom();
+    }
+  }, [currentConversation?.messages?.length]);
 
+  // Update the mutation observer to use our new scroll logic
+  useEffect(() => {
+    // Only set up observer if we have messages
+    if (!currentConversation?.messages?.length) return;
+    
+    // Create a mutation observer to watch for content changes in the AI message
+    const messageContainer = messagesEndRef.current?.parentElement;
+    if (!messageContainer) return;
+    
+    const observer = new MutationObserver((mutations) => {
+      // Check if the mutations are related to AI response content
+      const hasContentChanges = mutations.some(mutation => {
+        return mutation.type === 'characterData' || 
+               (mutation.type === 'childList' && mutation.addedNodes.length > 0);
+      });
+      
+      if (hasContentChanges && isAiResponding) {
+        requestAnimationFrame(() => {
+          setTimeout(scrollToBottom, 10);
+        });
+      }
+    });
+    
+    // Start observing content changes with appropriate config
+    observer.observe(messageContainer, { 
+      childList: true, 
+      subtree: true, 
+      characterData: true
+    });
+    
+    // Clean up
+    return () => observer.disconnect();
+  }, [currentConversation?.messages?.length, isAiResponding]);
+
+  // Update the handleSubmit function to use our improved scrolling logic
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!input.trim() || isLoading) return;
@@ -175,6 +302,9 @@ const Chat: React.FC = () => {
     const tempAiMessageId = `ai-${Date.now()}`;
     setCurrentAiMessageId(tempAiMessageId);
     
+    // Force scroll to bottom after user sends message
+    setTimeout(forceScrollToBottom, 50);
+    
     try {
       // Send the message and get the real AI message ID
       const { id: aiMessageId } = await chatService.sendMessage(
@@ -187,11 +317,19 @@ const Chat: React.FC = () => {
             messageId: aiMessageId,
             content,
           }));
+          
+          // Use requestAnimationFrame for smoother scrolling during streaming updates
+          requestAnimationFrame(() => {
+            scrollToBottom();
+          });
         }
       );
       
       // Update our reference to the real AI message ID
       setCurrentAiMessageId(aiMessageId);
+      
+      // Final scroll after all processing is complete
+      setTimeout(forceScrollToBottom, 200);
     } catch (err) {
       // Handle error
       if (err instanceof ApiError) {
@@ -205,6 +343,8 @@ const Chat: React.FC = () => {
       setIsAiResponding(false);
       // We don't set currentAiMessageId to null here anymore
       // so that we can still reference it for loading state
+      // Force one final scroll after everything is complete
+      setTimeout(forceScrollToBottom, 500);
     }
   };
 
@@ -317,6 +457,17 @@ const Chat: React.FC = () => {
     setEditingContent('');
   };
 
+  const handleInputChange = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
+    setInput(e.target.value);
+  };
+  
+  const handleKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
+    if (e.key === 'Enter' && !e.shiftKey) {
+      e.preventDefault();
+      handleSubmit(e);
+    }
+  };
+
   const renderMessage = (message: Message) => {
     // Check if this is the latest assistant message
     const isLatestAssistantMessage = message.role === 'assistant' && 
@@ -346,59 +497,69 @@ const Chat: React.FC = () => {
               <SparklesIcon className="h-5 w-5 text-white" />
             </div>
           )}
-          <div className={`prose prose-invert max-w-2xl relative ${message.role === 'user' ? 'text-right' : 'text-left'}`}>
+          <div className={`prose dark:prose-invert prose-slate max-w-2xl relative ${message.role === 'user' ? 'text-right' : 'text-left'}`}>
             {isEditing ? (
               // Editing mode for user messages
               <div className="w-full">
                 <textarea
                   value={editingContent}
                   onChange={(e) => setEditingContent(e.target.value)}
-                  className="w-full resize-none bg-slate-800 text-white p-3 rounded-2xl focus:outline-none focus:ring-2 focus:ring-blue-500 border border-slate-700"
+                  className="w-full resize-none dark:bg-slate-800 bg-white dark:text-white text-slate-900 p-3 rounded-2xl focus:outline-none focus:ring-2 focus:ring-blue-500 dark:border-slate-700 border-slate-300 border"
                   rows={3}
                   autoFocus
                 />
-                <div className="flex justify-end mt-2 space-x-2">
+                <div className="flex items-center space-x-2 mt-2">
                   <button
                     onClick={handleCancelEdit}
-                    className="px-3 py-1 text-slate-300 hover:text-white bg-slate-700 hover:bg-slate-600 rounded-md transition-colors"
+                    className="px-3 py-1 text-sm rounded-md dark:bg-slate-700 bg-slate-200 dark:text-slate-300 text-slate-700 hover:dark:bg-slate-600 hover:bg-slate-300 transition-colors"
                   >
-                    取消
+                    {i18nService.t('cancel')}
                   </button>
                   <button
                     onClick={() => handleSaveEdit(message.id)}
-                    className="px-3 py-1 text-sm text-white bg-gradient-to-r from-blue-500 to-cyan-500 hover:from-blue-600 hover:to-cyan-600 rounded-md transition-colors"
+                    className="px-3 py-1 text-sm rounded-md bg-blue-500 text-white hover:bg-blue-600 transition-colors"
                   >
-                    保存
+                    {i18nService.t('save')}
                   </button>
                 </div>
               </div>
             ) : (
               // Normal display mode
-              <div className={`whitespace-pre-wrap text-white rounded-2xl px-4 py-3 bg-opacity-50 ${
+              <div className={`whitespace-pre-wrap dark:text-white text-slate-900 rounded-2xl px-4 py-3 bg-opacity-50 ${
                 message.role === 'user' 
-                  ? 'bg-gradient-to-r from-indigo-500/30 to-purple-500/30 rounded-tr-none' 
-                  : 'bg-gradient-to-r from-blue-500/20 to-cyan-500/20 rounded-tl-none'
+                  ? 'dark:bg-gradient-to-r dark:from-indigo-500/30 dark:to-purple-500/30 bg-gradient-to-r from-indigo-500/10 to-purple-500/10 rounded-tr-none' 
+                  : 'dark:bg-gradient-to-r dark:from-blue-500/20 dark:to-cyan-500/20 bg-gradient-to-r from-blue-500/10 to-cyan-500/10 rounded-tl-none'
               }`}
               >
                 {message.content ? (
                   <div className="markdown-content">
                     <ReactMarkdown 
                       remarkPlugins={[remarkGfm, remarkMath]}
-                      rehypePlugins={[rehypeKatex]}
-                      // @ts-ignore - Ignoring TypeScript errors for component customization
+                      rehypePlugins={[[rehypeKatex, { 
+                        throwOnError: false,
+                        output: 'html',
+                        trust: true,
+                        strict: false,
+                        macros: {
+                          // Add some common LaTeX macros if needed
+                          "\\R": "\\mathbb{R}",
+                          "\\N": "\\mathbb{N}",
+                          "\\Z": "\\mathbb{Z}"
+                        }
+                      }]]}
                       components={{
                         p: ({ node, className, children, ...props }) => (
-                          <p className="my-1 leading-normal text-slate-100" {...props}>
+                          <p className="my-1 leading-normal dark:text-slate-100 text-slate-800" {...props}>
                             {children}
                           </p>
                         ),
                         h1: ({ node, className, children, ...props }) => (
-                          <h1 className="text-2xl font-bold mt-4 mb-0.5 pb-1 border-b border-slate-700" {...props}>
+                          <h1 className="text-2xl font-bold mt-4 mb-0.5 pb-1 dark:border-slate-700 border-slate-300 border-b" {...props}>
                             {children}
                           </h1>
                         ),
                         h2: ({ node, className, children, ...props }) => (
-                          <h2 className="text-xl font-bold mt-3 mb-0.5 pb-1 border-b border-slate-700" {...props}>
+                          <h2 className="text-xl font-bold mt-3 mb-0.5 pb-1 dark:border-slate-700 border-slate-300 border-b" {...props}>
                             {children}
                           </h2>
                         ),
@@ -423,7 +584,7 @@ const Chat: React.FC = () => {
                           </li>
                         ),
                         blockquote: ({ node, className, children, ...props }) => (
-                          <blockquote className="border-l-4 border-slate-500 pl-4 py-0.5 my-1 bg-slate-800/50 rounded-r" {...props}>
+                          <blockquote className="border-l-4 dark:border-slate-500 border-slate-400 pl-4 py-0.5 my-1 dark:bg-slate-800/50 bg-slate-200/50 rounded-r" {...props}>
                             {children}
                           </blockquote>
                         ),
@@ -433,7 +594,7 @@ const Chat: React.FC = () => {
                           // @ts-ignore - Ignoring TypeScript complaints about inline property
                           return !props.inline && match ? (
                             <div className="my-2 rounded-md overflow-hidden">
-                              <div className="bg-slate-900 px-4 py-1 text-xs text-slate-400 border-b border-slate-700">
+                              <div className="dark:bg-slate-900 bg-slate-200 px-4 py-1 text-xs dark:text-slate-400 text-slate-600 dark:border-slate-700 border-slate-300 border-b">
                                 {match[1]}
                               </div>
                               <SyntaxHighlighter
@@ -447,30 +608,30 @@ const Chat: React.FC = () => {
                               </SyntaxHighlighter>
                             </div>
                           ) : (
-                            <code className="bg-slate-800 px-1.5 py-0.5 rounded text-sm text-pink-400" {...props}>
+                            <code className="dark:bg-slate-800 bg-slate-200 px-1.5 py-0.5 rounded text-sm dark:text-pink-400 text-pink-600" {...props}>
                               {children}
                             </code>
                           );
                         },
                         table: ({ node, className, children, ...props }) => (
                           <div className="my-4 overflow-x-auto">
-                            <table className="border-collapse border border-slate-700 w-full" {...props}>
+                            <table className="border-collapse dark:border-slate-700 border-slate-300 border w-full" {...props}>
                               {children}
                             </table>
                           </div>
                         ),
                         thead: ({ node, className, children, ...props }) => (
-                          <thead className="bg-slate-800" {...props}>
+                          <thead className="dark:bg-slate-800 bg-slate-200" {...props}>
                             {children}
                           </thead>
                         ),
                         tbody: ({ node, className, children, ...props }) => (
-                          <tbody className="divide-y divide-slate-700" {...props}>
+                          <tbody className="divide-y dark:divide-slate-700 divide-slate-300" {...props}>
                             {children}
                           </tbody>
                         ),
                         tr: ({ node, className, children, ...props }) => (
-                          <tr className="divide-x divide-slate-700" {...props}>
+                          <tr className="divide-x dark:divide-slate-700 divide-slate-300" {...props}>
                             {children}
                           </tr>
                         ),
@@ -480,12 +641,18 @@ const Chat: React.FC = () => {
                           </th>
                         ),
                         td: ({ node, className, children, ...props }) => (
-                          <td className="px-4 py-2 border-slate-700" {...props}>
+                          <td className="px-4 py-2" {...props}>
                             {children}
                           </td>
                         ),
-                        a: ({ node, className, children, ...props }) => (
-                          <a className="text-blue-400 hover:text-blue-300 underline" {...props}>
+                        a: ({ node, href, className, children, ...props }) => (
+                          <a 
+                            href={href}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="text-blue-400 hover:text-blue-300 underline"
+                            {...props}
+                          >
                             {children}
                           </a>
                         ),
@@ -497,15 +664,13 @@ const Chat: React.FC = () => {
                         ),
                       }}
                     >
-                      {message.content}
+                      {convertLatexDelimiters(message.content)}
                     </ReactMarkdown>
                   </div>
+                ) : showLoading ? (
+                  <TypingIndicator />
                 ) : (
-                  showLoading && (
-                    <div className="min-h-[24px] flex items-center">
-                      <TypingIndicator />
-                    </div>
-                  )
+                  <span className="text-slate-500 italic">{i18nService.t('emptyMessage')}</span>
                 )}
               </div>
             )}
@@ -522,8 +687,8 @@ const Chat: React.FC = () => {
             } transition-opacity duration-200`}>
               <button
                 onClick={() => handleCopyMessage(message)}
-                className="p-1 text-slate-400 hover:text-white rounded transition-colors hover:bg-slate-700"
-                title="复制消息"
+                className="p-1 dark:text-slate-400 text-slate-500 dark:hover:text-white hover:text-slate-900 rounded transition-colors dark:hover:bg-slate-700 hover:bg-slate-200"
+                title={i18nService.t('copyToClipboard')}
                 disabled={!message.content || isEditing}
               >
                 {copiedMessageId === message.id ? (
@@ -535,8 +700,8 @@ const Chat: React.FC = () => {
               {message.role === 'user' && (
                 <button
                   onClick={() => handleEditMessage(message)}
-                  className="p-1 text-slate-400 hover:text-white rounded transition-colors hover:bg-slate-700"
-                  title="编辑消息"
+                  className="p-1 dark:text-slate-400 text-slate-500 dark:hover:text-white hover:text-slate-900 rounded transition-colors dark:hover:bg-slate-700 hover:bg-slate-200"
+                  title={i18nService.t('editMessage')}
                   disabled={!message.content || isEditing}
                 >
                   <PencilSquareIcon className="h-4 w-4" />
@@ -547,7 +712,7 @@ const Chat: React.FC = () => {
             {showLoading && (
               <div className="text-xs text-blue-400 mt-1 ml-1 flex items-center">
                 <SparklesIcon className="h-3 w-3 mr-1 animate-pulse" />
-                思考中...
+                {i18nService.t('thinking')}
               </div>
             )}
           </div>
@@ -578,7 +743,7 @@ const Chat: React.FC = () => {
         disabled={isLoading || !input.trim()}
         className={`p-1.5 rounded-full ${
           isLoading || !input.trim()
-            ? 'text-slate-400 bg-slate-700'
+            ? 'dark:text-slate-400 text-slate-400 dark:bg-slate-700 bg-slate-200'
             : 'text-white bg-gradient-to-r from-blue-500 to-cyan-500 hover:from-blue-600 hover:to-cyan-600 shadow-md'
         }`}
       >
@@ -589,14 +754,14 @@ const Chat: React.FC = () => {
 
   if (!currentConversationId) {
     return (
-      <div className="flex-1 flex flex-col bg-slate-900 relative">
+      <div className="flex-1 flex flex-col dark:bg-slate-900 bg-slate-50 relative">
         {/* Header with Model Selector */}
-        <div className="absolute top-0 left-0 right-0 h-14 flex items-center px-4 bg-slate-900 border-b border-slate-700 z-10">
+        <div className="absolute top-0 left-0 right-0 h-14 flex items-center px-4 dark:bg-slate-900 bg-slate-50 dark:border-slate-700 border-slate-300 border-b z-10">
           <ModelSelector />
         </div>
 
         {/* Messages Area */}
-        <div className="flex-1 overflow-y-auto pt-16 pb-36">
+        <div className="flex-1 overflow-y-auto pt-16" style={{ paddingBottom: `${bottomPadding}px` }}>
           {error && (
             <div className="sticky top-0 z-10">
               <ErrorMessage message={error} onClose={() => setError(null)} />
@@ -610,41 +775,95 @@ const Chat: React.FC = () => {
                   <div className="w-16 h-16 mx-auto mb-4 rounded-full bg-gradient-to-br from-blue-400 to-cyan-500 flex items-center justify-center shadow-lg">
                     <LightBulbIcon className="h-8 w-8 text-white" />
                   </div>
-                  <h2 className="text-3xl font-bold mb-3 text-white">FisherChat</h2>
-                  <p className="text-slate-300 text-lg">我能帮你做什么呢？</p>
+                  <h2 className="text-3xl font-bold mb-3 dark:text-white text-slate-900">FisherChat</h2>
+                  <p className="dark:text-slate-300 text-slate-600 text-lg">{i18nService.t('welcomeMessage')}</p>
                 </div>
               </div>
             </div>
           </div>
+          <div ref={messagesEndRef} />
         </div>
 
-        {/* Input Area */}
-        <div className="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-slate-900 via-slate-900 to-transparent">
+        {/* Input Area with Gradient Backdrop */}
+        <div ref={inputAreaRef} className="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-slate-50 via-slate-50 to-transparent dark:from-slate-900 dark:via-slate-900 pt-10">
           <div className="max-w-3xl mx-auto px-4 pb-6">
             <form onSubmit={handleSubmit} className="relative">
               <div className="flex items-end space-x-2">
                 <div className="flex-1 relative">
                   <textarea
+                    ref={textareaRef}
+                    placeholder={i18nService.t('typeMessage')}
                     value={input}
-                    onChange={(e) => setInput(e.target.value)}
-                    placeholder="给 FisherChat 发送消息..."
-                    rows={1}
-                    className="w-full resize-none rounded-2xl bg-slate-800 text-white placeholder-slate-400 p-4 pr-14 focus:outline-none focus:ring-2 focus:ring-blue-500 shadow-lg border border-slate-700"
-                    style={{
-                      minHeight: '56px',
-                      maxHeight: '200px',
-                    }}
-                    onKeyDown={(e) => {
-                      if (e.key === 'Enter' && !e.shiftKey) {
-                        e.preventDefault();
-                        handleSubmit(e);
-                      }
-                    }}
+                    onChange={handleInputChange}
+                    onKeyDown={handleKeyDown}
+                    disabled={isLoading}
+                    className="w-full rounded-xl dark:bg-slate-800 bg-white px-4 py-3 pr-14 dark:text-white text-slate-900 dark:border-slate-700 border-slate-300 border focus:ring-2 focus:ring-blue-500 focus:border-blue-500 dark:placeholder-slate-400 placeholder-slate-500 resize-none max-h-36 overflow-y-auto shadow-md"
+                    style={{ minHeight: '56px' }}
                   />
                   <div className="absolute right-3 bottom-2.5 flex items-center space-x-2">
                     <button
                       type="button"
-                      className="p-1.5 text-slate-400 hover:text-white rounded-full hover:bg-slate-700"
+                      className="p-1.5 dark:text-slate-400 text-slate-500 dark:hover:text-white hover:text-slate-900 rounded-full dark:hover:bg-slate-700 hover:bg-slate-200"
+                    >
+                      <MicrophoneIcon className="h-5 w-5" />
+                    </button>
+                    {renderInputButton()}
+                  </div>
+                </div>
+              </div>
+            </form>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  if (!currentConversation || currentConversation.messages.length === 0) {
+    return (
+      <div className="flex-1 flex flex-col dark:bg-slate-900 bg-slate-50 relative h-full">
+        {/* Header with Model Selector - 保持在左上角 */}
+        <div className="h-14 flex items-center px-4 dark:bg-slate-900 bg-slate-50 dark:border-slate-700 border-slate-300 border-b z-10 shrink-0">
+          <ModelSelector />
+        </div>
+        
+        {/* 空聊天界面 - 欢迎信息 */}
+        <div className="flex-1 overflow-y-auto min-h-0" style={{ paddingBottom: `${bottomPadding}px` }}>
+          <div className="max-w-3xl mx-auto">
+            <div className="py-10 px-4">
+              <div className="max-w-3xl mx-auto flex justify-center">
+                <div className="text-center">
+                  <div className="w-16 h-16 mx-auto mb-4 rounded-full bg-gradient-to-br from-blue-400 to-cyan-500 flex items-center justify-center shadow-lg">
+                    <LightBulbIcon className="h-8 w-8 text-white" />
+                  </div>
+                  <h2 className="text-3xl font-bold mb-3 dark:text-white text-slate-900">FisherChat</h2>
+                  <p className="dark:text-slate-300 text-slate-600 text-lg">{i18nService.t('welcomeMessage')}</p>
+                </div>
+              </div>
+            </div>
+          </div>
+          <div ref={messagesEndRef} />
+        </div>
+        
+        {/* 输入框部分 - 保持提交按钮在右侧 */}
+        <div ref={inputAreaRef} className="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-slate-50 via-slate-50 to-transparent dark:from-slate-900 dark:via-slate-900 pt-10">
+          <div className="max-w-3xl mx-auto px-4 pb-6">
+            <form onSubmit={handleSubmit} className="relative">
+              <div className="flex items-end space-x-2">
+                <div className="flex-1 relative">
+                  <textarea
+                    ref={textareaRef}
+                    placeholder={i18nService.t('typeMessage')}
+                    value={input}
+                    onChange={handleInputChange}
+                    onKeyDown={handleKeyDown}
+                    disabled={isLoading}
+                    className="w-full rounded-xl dark:bg-slate-800 bg-white px-4 py-3 pr-14 dark:text-white text-slate-900 dark:border-slate-700 border-slate-300 border focus:ring-2 focus:ring-blue-500 focus:border-blue-500 dark:placeholder-slate-400 placeholder-slate-500 resize-none max-h-36 overflow-y-auto shadow-md"
+                    style={{ minHeight: '56px' }}
+                  />
+                  <div className="absolute right-3 bottom-2.5 flex items-center space-x-2">
+                    <button
+                      type="button"
+                      className="p-1.5 dark:text-slate-400 text-slate-500 dark:hover:text-white hover:text-slate-900 rounded-full dark:hover:bg-slate-700 hover:bg-slate-200"
                     >
                       <MicrophoneIcon className="h-5 w-5" />
                     </button>
@@ -660,20 +879,20 @@ const Chat: React.FC = () => {
   }
 
   return (
-    <div className="flex-1 flex flex-col bg-slate-900 relative h-full">
+    <div className="flex-1 flex flex-col dark:bg-slate-900 bg-slate-50 relative h-full">
       {/* Header with Model Selector */}
-      <div className="h-14 flex items-center px-4 bg-slate-900 border-b border-slate-700 z-10 shrink-0">
+      <div className="h-14 flex items-center px-4 dark:bg-slate-900 bg-slate-50 dark:border-slate-700 border-slate-300 border-b z-10 shrink-0">
         <ModelSelector />
       </div>
 
       {/* Messages */}
-      <div className="flex-1 overflow-y-auto min-h-0">
+      <div className="flex-1 overflow-y-auto min-h-0" style={{ paddingBottom: `${bottomPadding}px` }}>
         {error && (
           <div className="sticky top-0 z-10">
             <ErrorMessage message={error} onClose={() => setError(null)} />
           </div>
         )}
-        <div className="max-w-3xl mx-auto">
+        <div className="max-w-3xl mx-auto pt-4">
           {(!currentConversation?.messages || currentConversation.messages.length === 0) ? (
             // Welcome Message when no messages
             <div className="py-10 px-4">
@@ -682,8 +901,8 @@ const Chat: React.FC = () => {
                   <div className="w-16 h-16 mx-auto mb-4 rounded-full bg-gradient-to-br from-blue-400 to-cyan-500 flex items-center justify-center shadow-lg">
                     <LightBulbIcon className="h-8 w-8 text-white" />
                   </div>
-                  <h2 className="text-3xl font-bold mb-3 text-white">FisherChat</h2>
-                  <p className="text-slate-300 text-lg">我能帮你做什么呢？</p>
+                  <h2 className="text-3xl font-bold mb-3 dark:text-white text-slate-900">FisherChat</h2>
+                  <p className="dark:text-slate-300 text-slate-600 text-lg">{i18nService.t('welcomeMessage')}</p>
                 </div>
               </div>
             </div>
@@ -691,37 +910,30 @@ const Chat: React.FC = () => {
             // Conversation Messages
             currentConversation.messages.map(renderMessage)
           )}
-          <div ref={messagesEndRef} />
+          <div ref={messagesEndRef} className="h-20" /> {/* Increased height to ensure better scrolling */}
         </div>
       </div>
 
-      {/* Input Area */}
-      <div className="border-t border-slate-700 bg-slate-900 py-2 px-4 shrink-0">
-        <div className="max-w-3xl mx-auto">
+      {/* Input Area with Gradient Backdrop */}
+      <div ref={inputAreaRef} className="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-slate-50 via-slate-50 to-transparent dark:from-slate-900 dark:via-slate-900 pt-10">
+        <div className="max-w-3xl mx-auto px-4 pb-6">
           <form onSubmit={handleSubmit} className="relative">
             <div className="flex items-end space-x-2">
               <div className="flex-1 relative">
                 <textarea
+                  ref={textareaRef}
+                  placeholder={i18nService.t('typeMessage')}
                   value={input}
-                  onChange={(e) => setInput(e.target.value)}
-                  placeholder="给 FisherChat 发送消息..."
-                  rows={1}
-                  className="w-full resize-none rounded-2xl bg-slate-800 text-white placeholder-slate-400 p-4 pr-14 focus:outline-none focus:ring-2 focus:ring-blue-500 shadow-lg border border-slate-700"
-                  style={{
-                    minHeight: '56px',
-                    maxHeight: '200px',
-                  }}
-                  onKeyDown={(e) => {
-                    if (e.key === 'Enter' && !e.shiftKey) {
-                      e.preventDefault();
-                      handleSubmit(e);
-                    }
-                  }}
+                  onChange={handleInputChange}
+                  onKeyDown={handleKeyDown}
+                  disabled={isLoading}
+                  className="w-full rounded-xl dark:bg-slate-800 bg-white px-4 py-3 pr-14 dark:text-white text-slate-900 dark:border-slate-700 border-slate-300 border focus:ring-2 focus:ring-blue-500 focus:border-blue-500 dark:placeholder-slate-400 placeholder-slate-500 resize-none max-h-36 overflow-y-auto shadow-md"
+                  style={{ minHeight: '56px' }}
                 />
                 <div className="absolute right-3 bottom-2.5 flex items-center space-x-2">
                   <button
                     type="button"
-                    className="p-1.5 text-slate-400 hover:text-white rounded-full hover:bg-slate-700"
+                    className="p-1.5 dark:text-slate-400 text-slate-500 dark:hover:text-white hover:text-slate-900 rounded-full dark:hover:bg-slate-700 hover:bg-slate-200"
                   >
                     <MicrophoneIcon className="h-5 w-5" />
                   </button>

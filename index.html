@@ -4,6 +4,38 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>FisherChat</title>
+    <script>
+      // 在页面加载前预设主题，避免闪烁
+      (function() {
+        try {
+          const savedConfig = localStorage.getItem('app_config');
+          if (savedConfig) {
+            const config = JSON.parse(savedConfig);
+            const theme = config.theme || 'system';
+            
+            if (theme === 'dark') {
+              document.documentElement.classList.add('dark');
+              document.documentElement.style.backgroundColor = '#0f172a';
+            } else if (theme === 'light') {
+              document.documentElement.classList.add('light');
+              document.documentElement.style.backgroundColor = '#f8fafc';
+            } else {
+              // 跟随系统
+              const prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
+              if (prefersDark) {
+                document.documentElement.classList.add('dark');
+                document.documentElement.style.backgroundColor = '#0f172a';
+              } else {
+                document.documentElement.classList.add('light');
+                document.documentElement.style.backgroundColor = '#f8fafc';
+              }
+            }
+          }
+        } catch (e) {
+          console.error('Error applying theme early:', e);
+        }
+      })();
+    </script>
   </head>
   <body>
     <div id="root"></div>

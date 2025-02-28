@@ -12,7 +12,7 @@
 
 /* Improve code block styles */
 pre {
-  background-color: rgba(15, 23, 42, 0.8) !important;
+  @apply dark:bg-slate-900 bg-slate-100;
   border-radius: 0.5rem !important;
   padding: 1em !important;
   margin: 1em 0 !important;
@@ -31,20 +31,20 @@ table {
 }
 
 th, td {
-  border: 1px solid #334155;
+  @apply dark:border-slate-700 border-slate-300;
   padding: 0.5em;
 }
 
 th {
-  background-color: rgba(51, 65, 85, 0.5);
+  @apply dark:bg-slate-800/50 bg-slate-200/50;
   font-weight: bold;
 }
 
 /* Style for blockquotes */
 blockquote {
-  border-left: 3px solid #334155;
+  @apply dark:border-slate-700 border-slate-300 dark:text-slate-300 text-slate-600;
+  border-left-width: 3px;
   padding-left: 1em;
-  color: #cbd5e1;
   font-style: italic;
   margin: 1em 0;
 }
@@ -54,14 +54,41 @@ blockquote {
   line-height: 1.5;
   font-weight: 400;
 
-  color-scheme: light dark;
-  color: rgba(255, 255, 255, 0.87);
-  background-color: #242424;
-
   font-synthesis: none;
   text-rendering: optimizeLegibility;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
+}
+
+/* 深色模式样式 */
+.dark {
+  color-scheme: dark;
+  color: rgba(255, 255, 255, 0.87);
+  background-color: #0f172a; /* slate-900 */
+}
+
+/* 浅色模式样式 */
+.light {
+  color-scheme: light;
+  color: #0f172a; /* slate-900 */
+  background-color: #f8fafc; /* slate-50 */
+}
+
+/* 确保所有容器都继承主题 */
+.dark #root,
+.dark .App,
+.dark .flex-1,
+.dark main {
+  background-color: #0f172a; /* slate-900 */
+  color: rgba(255, 255, 255, 0.87);
+}
+
+.light #root,
+.light .App,
+.light .flex-1,
+.light main {
+  background-color: #f8fafc; /* slate-50 */
+  color: #0f172a; /* slate-900 */
 }
 
 body {
@@ -84,12 +111,33 @@ body {
 }
 
 ::-webkit-scrollbar-thumb {
-  background: #666;
+  @apply dark:bg-slate-600 bg-slate-400;
   border-radius: 4px;
 }
 
 ::-webkit-scrollbar-thumb:hover {
-  background: #888;
+  @apply dark:bg-slate-500 bg-slate-500;
+}
+
+/* Style for select options to match theme */
+.dark option {
+  background-color: #1e293b; /* slate-800 */
+  color: rgba(255, 255, 255, 0.87);
+}
+
+.light option {
+  background-color: #f8fafc; /* slate-50 */
+  color: #0f172a; /* slate-900 */
+}
+
+/* Ensure select elements have proper styling in Firefox */
+select {
+  -moz-appearance: none;
+  appearance: none;
+}
+
+select::-ms-expand {
+  display: none;
 }
 
 .draggable {

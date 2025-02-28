@@ -13,12 +13,60 @@ export interface AppConfig {
     }>;
     defaultModel: string;
   };
+  // 多模型提供商配置
+  providers?: {
+    openai: {
+      enabled: boolean;
+      apiKey: string;
+      baseUrl: string;
+      models?: Array<{
+        id: string;
+        name: string;
+      }>;
+    };
+    deepseek: {
+      enabled: boolean;
+      apiKey: string;
+      baseUrl: string;
+      models?: Array<{
+        id: string;
+        name: string;
+      }>;
+    };
+    gemini: {
+      enabled: boolean;
+      apiKey: string;
+      baseUrl: string;
+      models?: Array<{
+        id: string;
+        name: string;
+      }>;
+    };
+    [key: string]: {
+      enabled: boolean;
+      apiKey: string;
+      baseUrl: string;
+      models?: Array<{
+        id: string;
+        name: string;
+      }>;
+    };
+  };
   // 主题配置
-  theme: 'light' | 'dark';
+  theme: 'light' | 'dark' | 'system';
+  // 语言配置
+  language: 'zh' | 'en';
   // 应用配置
   app: {
     port: number;
     isDevelopment: boolean;
+  };
+  // 快捷键配置
+  shortcuts?: {
+    newChat: string;
+    search: string;
+    settings: string;
+    [key: string]: string;
   };
 }
 
@@ -35,11 +83,17 @@ export const defaultConfig: AppConfig = {
     ],
     defaultModel: 'deepseek-chat',
   },
-  theme: 'light',
+  theme: 'system',
+  language: 'zh',
   app: {
     port: 3000,
     isDevelopment: process.env.NODE_ENV === 'development',
   },
+  shortcuts: {
+    newChat: 'Ctrl+N',
+    search: 'Ctrl+F',
+    settings: 'Ctrl+,',
+  }
 };
 
 // 配置存储键
